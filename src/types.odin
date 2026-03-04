@@ -23,6 +23,7 @@ SuiteEntry :: struct {
 	path:     string,   // relative to root
 	name:     string,   // last path component, for display
 	nostrict: bool,     // skip -strict-style -vet when checking
+	is_main:  bool,     // true if this is the main entry (declared via main:)
 }
 
 CollectionDecl :: struct {

@@ -107,6 +107,25 @@ load_suite_config :: proc(root_dir: string, config_file: string = "") -> (entrie
 			continue
 		}
 
+		// main: path [nostrict]  (same as entry but marks this as the main executable)
+		if strings.has_prefix(t, "main:") {
+			rest := strings.trim_space(t[len("main:"):])
+			if len(rest) == 0 { continue }
+			ns := strings.has_suffix(rest, "nostrict")
+			path := strings.trim_space(rest[:len(rest) - len("nostrict")]) if ns else rest
+			if len(path) == 0 { continue }
+			if !_is_safe_suite_path(path) { continue }
+			name := filepath.base(path)
+			append(&entries, SuiteEntry{
+				kind     = .Build,
+				path     = strings.clone(path),
+				name     = strings.clone(name),
+				nostrict = ns,
+				is_main  = true,
+			})
+			continue
+		}
+
 		// test: path [nostrict]  (check + test only, no build)
 		if strings.has_prefix(t, "test:") {
 			rest := strings.trim_space(t[len("test:"):])
