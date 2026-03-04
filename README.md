@@ -1,4 +1,4 @@
-# .odin-suite
+# Zilo-Suite
 
 Incremental build, check, and test runner for [Odin](https://odin-lang.org) projects.
 
@@ -7,23 +7,23 @@ Parallel workers, content-hash stamps, live ANSI table — one config file.
 ## Install
 
 ```sh
-odin build . -out:suite
-# move `suite` (or `suite.exe`) somewhere on your PATH
+odin build . -out:zs
+# move `zs` (or `zs.exe`) somewhere on your PATH
 ```
 
 ## Usage
 
-Drop a `.suite` file in your project root, then run:
+Drop a `.zilo-suite` file in your project root, then run:
 
 ```
-suite                               # check → test → build (all entries)
-suite -check                        # check only
-suite -test                         # check → test
-suite -all -debug                   # check → test → build with -debug
-suite -f                            # force: ignore cached stamps, rebuild everything
-suite -packages='+myapp'            # only entries matching "myapp"
-suite -packages='-tests'            # exclude entries matching "tests"
-suite -test -packages='+lib,+core'  # test only lib and core
+zs                               # check → test → build (all entries)
+zs -check                        # check only
+zs -test                         # check → test
+zs -all -debug                   # check → test → build with -debug
+zs -f                            # force: ignore cached stamps, rebuild everything
+zs -packages='+myapp'            # only entries matching "myapp"
+zs -packages='-tests'            # exclude entries matching "tests"
+zs -test -packages='+lib,+core'  # test only lib and core
 ```
 
 ### Flags
@@ -40,7 +40,7 @@ suite -test -packages='+lib,+core'  # test only lib and core
 
 ## Config format
 
-Create a `.suite` file in your project root:
+Create a `.zilo-suite` file in your project root:
 
 ```
 # Comments start with #
@@ -78,9 +78,9 @@ For each `entry:` path, suite recursively walks subdirectories. Any directory co
 
 ## How it works
 
-1. Reads `.suite` from the working directory
+1. Reads `.zilo-suite` from the working directory
 2. Hashes all `.odin` files in each entry directory (FNV-64a)
-3. Compares against stored stamps (`.suite-stamps` next to the binary)
+3. Compares against stored stamps (`.zilo-suite-stamps` next to the binary)
 4. Skips entries whose hash matches and artifact exists on disk
 5. Runs stale entries in parallel threads: check → test → build
 6. Displays a live ANSI table with per-entry status

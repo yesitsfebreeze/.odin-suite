@@ -6,10 +6,10 @@ import "core:path/filepath"
 import "core:strings"
 
 suite_usage :: proc() {
-	fmt.println("usage: suite [flags]")
+	fmt.println("usage: zs [flags]")
 	fmt.println("")
 	fmt.println("Incremental build, check, and test runner for Odin projects.")
-	fmt.println("Reads a .suite config file from the project root.")
+	fmt.println("Reads a .zilo-suite config file from the project root.")
 	fmt.println("")
 	fmt.println("flags:")
 	fmt.println("  -all                      check -> test -> build  (default)")
@@ -18,7 +18,7 @@ suite_usage :: proc() {
 	fmt.println("  -debug                    pass -debug to odin build")
 	fmt.println("  -f                        force: ignore cached stamps and rebuild everything")
 	fmt.println("  -root=DIR                 project root directory (default: cwd)")
-	fmt.println("  -config=FILE              config file path (default: <root>/.suite)")
+	fmt.println("  -config=FILE              config file path (default: <root>/.zilo-suite)")
 	fmt.println("  -packages=FILTER          filter which packages to run")
 	fmt.println("                            +name  include only entries matching name")
 	fmt.println("                            -name  exclude entries matching name")
@@ -27,15 +27,15 @@ suite_usage :: proc() {
 	fmt.println("  -help                     show this help")
 	fmt.println("")
 	fmt.println("examples:")
-	fmt.println("  suite                               check -> test -> build (all)")
-	fmt.println("  suite -check                        check only (all packages)")
-	fmt.println("  suite -test                         check -> test (all packages)")
-	fmt.println("  suite -all -debug                   full pipeline with debug symbols")
-	fmt.println("  suite -f                            force rebuild everything")
-	fmt.println("  suite -root=/path/to/project         run against a different directory")
-	fmt.println("  suite -packages='+myapp'            only entries matching myapp")
-	fmt.println("  suite -packages='-tests'            exclude entries matching tests")
-	fmt.println("  suite -test -packages='+lib,+core'  test only lib and core")
+	fmt.println("  zs                               check -> test -> build (all)")
+	fmt.println("  zs -check                        check only (all packages)")
+	fmt.println("  zs -test                         check -> test (all packages)")
+	fmt.println("  zs -all -debug                   full pipeline with debug symbols")
+	fmt.println("  zs -f                            force rebuild everything")
+	fmt.println("  zs -root=/path/to/project         run against a different directory")
+	fmt.println("  zs -packages='+myapp'            only entries matching myapp")
+	fmt.println("  zs -packages='-tests'            exclude entries matching tests")
+	fmt.println("  zs -test -packages='+lib,+core'  test only lib and core")
 }
 
 parse_cli_args :: proc(args: []string) -> (plan: SuitePlan, include_patterns: [dynamic]string, exclude_patterns: [dynamic]string, root_dir: string, config_file: string, debug_build: bool, force_build: bool, show_help: bool, ok: bool) {

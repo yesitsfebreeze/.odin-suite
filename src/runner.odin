@@ -59,7 +59,7 @@ run_incremental_suite :: proc(root_dir: string, config_file: string, include_pat
 			fmt.eprintln("No packages found, skipping suite.")
 			suite_exit(0)
 		} else {
-			fmt.sbprintf(&b, "fail: .suite has no entries\n")
+			fmt.sbprintf(&b, "fail: .zilo-suite has no entries\n")
 			log := strings.clone(strings.to_string(b))
 			os.write_entire_file(log_path, transmute([]u8)log)
 			delete(log)

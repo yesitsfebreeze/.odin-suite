@@ -10,9 +10,9 @@ GREEN  :: "\x1b[32m"
 YELLOW :: "\x1b[33m"
 BLUE   :: "\x1b[34m"
 
-LOG_FILE_NAME    :: "suite.log"
-STAMPS_FILE_NAME :: ".suite-stamps"
-SUITE_CONFIG     :: ".suite"
+LOG_FILE_NAME    :: "zilo_suite.log"
+STAMPS_FILE_NAME :: ".zilo-suite-stamps"
+SUITE_CONFIG     :: ".zilo-suite"
 
 // --- Config types ------------------------------------------------------------
 

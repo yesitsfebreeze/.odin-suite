@@ -43,7 +43,7 @@ _is_safe_suite_path :: proc(s: string) -> bool {
 	return true
 }
 
-// load_suite_config reads the .suite file from root_dir.
+// load_suite_config reads the .zilo-suite file from root_dir.
 // Format per line:
 //   build_args: collection name=relative/path
 //   entry: relative/path
