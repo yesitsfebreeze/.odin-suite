@@ -87,13 +87,13 @@ run_incremental_suite :: proc(root_dir: string, config_file: string, include_pat
 
 	// ── Phase 1: Run sub-package tests (check + test only) ─────────────────────
 	if len(sub_filtered) > 0 {
-		sub_failed := run_sub_entries(clean_root_dir, sub_filtered[:], collections[:], stamps, plan, force_build, &b)
+		sub_failed := run_sub_entries(clean_root_dir, sub_filtered[:], collections[:], &stamps, plan, force_build, &b)
 		if sub_failed { failed_any = true }
 	}
 
 	// ── Phase 2: Run main entries (with table display) ─────────────────────────
 	if len(main_filtered) > 0 {
-		main_failed := run_main_entries(clean_root_dir, main_filtered[:], collections[:], stamps, plan, debug_build, force_build, &b)
+		main_failed := run_main_entries(clean_root_dir, main_filtered[:], collections[:], &stamps, plan, debug_build, force_build, &b)
 		if main_failed { failed_any = true }
 	}
 
@@ -211,7 +211,7 @@ run_sub_entries :: proc(
 
 		// Check stamp.
 		current_hash := hash_with_collections(root_dir, entry.path, collections)
-		stored_hash := stamps[entry.path] if entry.path in stamps else ""
+		stored_hash := stamps^[entry.path] if entry.path in stamps^ else ""
 		is_cached := !force_build && len(stored_hash) > 0 && stored_hash == current_hash
 
 		if is_cached {
@@ -310,7 +310,7 @@ run_sub_entries :: proc(
 		result := results[j]
 		if result.status == .Failed { failed = true }
 		if result.update_stamp {
-			stamps[strings.clone(result.stamp_key)] = strings.clone(result.stamp_hash)
+			stamps^[strings.clone(result.stamp_key)] = strings.clone(result.stamp_hash)
 		}
 		delete(result.stamp_key)
 		delete(result.stamp_hash)
@@ -334,7 +334,7 @@ run_main_entries :: proc(
 	root_dir:    string,
 	entries:     []SuiteEntry,
 	collections: []CollectionDecl,
-	stamps:      map[string]string,
+	stamps:      ^map[string]string,
 	plan:        SuitePlan,
 	debug_build: bool,
 	force_build: bool,
@@ -376,7 +376,7 @@ run_main_entries :: proc(
 		current_hash := hash_with_collections(root_dir, entry.path, collections)
 
 		// Check if stamp matches.
-		stored_hash := stamps[entry.path] if entry.path in stamps else ""
+		stored_hash := stamps^[entry.path] if entry.path in stamps^ else ""
 		is_cached := !force_build && len(stored_hash) > 0 && stored_hash == current_hash
 
 		// For build entries, also verify artifact exists.
@@ -487,7 +487,7 @@ run_main_entries :: proc(
 			result := results[j]
 			if result.status == .Failed { failed = true }
 			if result.update_stamp {
-				stamps[strings.clone(result.stamp_key)] = strings.clone(result.stamp_hash)
+				stamps^[strings.clone(result.stamp_key)] = strings.clone(result.stamp_hash)
 			}
 			delete(result.stamp_key)
 			delete(result.stamp_hash)
