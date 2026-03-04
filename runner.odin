@@ -7,7 +7,7 @@ import "core:strings"
 import "core:thread"
 import "core:time"
 
-run_incremental_suite :: proc(root_dir: string, include_patterns: [dynamic]string, exclude_patterns: [dynamic]string, plan: SuitePlan, debug_build: bool, force_build: bool) {
+run_incremental_suite :: proc(root_dir: string, config_file: string, include_patterns: [dynamic]string, exclude_patterns: [dynamic]string, plan: SuitePlan, debug_build: bool, force_build: bool) {
 	exe_path       := os.args[0]
 	exe_dir        := filepath.dir(exe_path)
 	clean_root_dir := filepath.clean(root_dir)
@@ -21,9 +21,10 @@ run_incremental_suite :: proc(root_dir: string, include_patterns: [dynamic]strin
 	b      := strings.builder_make()
 
 	// ── Load config ────────────────────────────────────────────────────────────
-	all_entries, collections, config_ok := load_suite_config(clean_root_dir)
+	all_entries, collections, config_ok := load_suite_config(clean_root_dir, config_file)
 	if !config_ok {
-		fmt.sbprintf(&b, "fail: could not read %s in %s\n", SUITE_CONFIG, clean_root_dir)
+		config_display := config_file if len(config_file) > 0 else SUITE_CONFIG
+		fmt.sbprintf(&b, "fail: could not read %s in %s\n", config_display, clean_root_dir)
 		log := strings.clone(strings.to_string(b))
 		os.write_entire_file(log_path, transmute([]u8)log)
 		delete(log)

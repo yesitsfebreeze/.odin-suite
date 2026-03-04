@@ -6,13 +6,19 @@ import "core:path/filepath"
 import "core:strings"
 
 suite_usage :: proc() {
-	fmt.println("usage: suite [-all] [-check] [-test] [-debug] [-f] [-packages=FILTER] [-help]")
+	fmt.println("usage: suite [flags]")
 	fmt.println("")
+	fmt.println("Incremental build, check, and test runner for Odin projects.")
+	fmt.println("Reads a .suite config file from the project root.")
+	fmt.println("")
+	fmt.println("flags:")
 	fmt.println("  -all                      check -> test -> build  (default)")
 	fmt.println("  -check                    check only")
 	fmt.println("  -test                     check -> test")
 	fmt.println("  -debug                    pass -debug to odin build")
 	fmt.println("  -f                        force: ignore cached stamps and rebuild everything")
+	fmt.println("  -root=DIR                 project root directory (default: cwd)")
+	fmt.println("  -config=FILE              config file path (default: <root>/.suite)")
 	fmt.println("  -packages=FILTER          filter which packages to run")
 	fmt.println("                            +name  include only entries matching name")
 	fmt.println("                            -name  exclude entries matching name")
@@ -24,18 +30,20 @@ suite_usage :: proc() {
 	fmt.println("  suite                               check -> test -> build (all)")
 	fmt.println("  suite -check                        check only (all packages)")
 	fmt.println("  suite -test                         check -> test (all packages)")
-	fmt.println("  suite -all -debug                   check -> test -> build with debug")
+	fmt.println("  suite -all -debug                   full pipeline with debug symbols")
 	fmt.println("  suite -f                            force rebuild everything")
-	fmt.println("  suite -packages='-zilo'             all steps, exclude zilo")
-	fmt.println("  suite -packages='+zilo'             all steps, include only zilo")
-	fmt.println("  suite -test -packages='+zilo,+buf'  test only zilo and buf")
+	fmt.println("  suite -root=/path/to/project         run against a different directory")
+	fmt.println("  suite -packages='+myapp'            only entries matching myapp")
+	fmt.println("  suite -packages='-tests'            exclude entries matching tests")
+	fmt.println("  suite -test -packages='+lib,+core'  test only lib and core")
 }
 
-parse_cli_args :: proc(args: []string) -> (plan: SuitePlan, include_patterns: [dynamic]string, exclude_patterns: [dynamic]string, root_dir: string, debug_build: bool, force_build: bool, show_help: bool, ok: bool) {
+parse_cli_args :: proc(args: []string) -> (plan: SuitePlan, include_patterns: [dynamic]string, exclude_patterns: [dynamic]string, root_dir: string, config_file: string, debug_build: bool, force_build: bool, show_help: bool, ok: bool) {
 	plan             = SuitePlan{}
 	include_patterns = make([dynamic]string)
 	exclude_patterns = make([dynamic]string)
 	root_dir         = ""
+	config_file      = ""
 	debug_build      = false
 	force_build      = false
 	show_help        = false
@@ -54,7 +62,7 @@ parse_cli_args :: proc(args: []string) -> (plan: SuitePlan, include_patterns: [d
 
 		// ─── mode flags ───
 		if a == "-all" {
-			if got_mode { return plan, include_patterns, exclude_patterns, "", false, false, false, false }
+			if got_mode { return plan, include_patterns, exclude_patterns, "", "", false, false, false, false }
 			plan.steps[0] = .Check
 			plan.steps[1] = .Test
 			plan.steps[2] = .Build
@@ -63,14 +71,14 @@ parse_cli_args :: proc(args: []string) -> (plan: SuitePlan, include_patterns: [d
 			continue
 		}
 		if a == "-check" {
-			if got_mode { return plan, include_patterns, exclude_patterns, "", false, false, false, false }
+			if got_mode { return plan, include_patterns, exclude_patterns, "", "", false, false, false, false }
 			plan.steps[0] = .Check
 			plan.step_count = 1
 			got_mode = true
 			continue
 		}
 		if a == "-test" {
-			if got_mode { return plan, include_patterns, exclude_patterns, "", false, false, false, false }
+			if got_mode { return plan, include_patterns, exclude_patterns, "", "", false, false, false, false }
 			plan.steps[0] = .Check
 			plan.steps[1] = .Test
 			plan.step_count = 2
@@ -90,11 +98,23 @@ parse_cli_args :: proc(args: []string) -> (plan: SuitePlan, include_patterns: [d
 			continue
 		}
 
+		// ─── root ───
+		if strings.has_prefix(a, "-root=") {
+			root_dir = strings.trim_space(a[len("-root="):])
+			continue
+		}
+
+		// ─── config ───
+		if strings.has_prefix(a, "-config=") {
+			config_file = strings.trim_space(a[len("-config="):])
+			continue
+		}
+
 		// ─── packages ───
 		if strings.has_prefix(a, "-packages=") {
 			raw := a[len("-packages="):]
 			inc, exc, pok := parse_package_filter(raw)
-			if !pok { return plan, include_patterns, exclude_patterns, "", false, false, false, false }
+			if !pok { return plan, include_patterns, exclude_patterns, "", "", false, false, false, false }
 			for v in inc { append(&include_patterns, v) }
 			for v in exc { append(&exclude_patterns, v) }
 			delete(inc)
@@ -103,11 +123,11 @@ parse_cli_args :: proc(args: []string) -> (plan: SuitePlan, include_patterns: [d
 		}
 
 		// ─── unknown ───
-		return plan, include_patterns, exclude_patterns, "", false, false, false, false
+		return plan, include_patterns, exclude_patterns, "", "", false, false, false, false
 	}
 
 	if show_help {
-		return plan, include_patterns, exclude_patterns, root_dir, debug_build, force_build, true, true
+		return plan, include_patterns, exclude_patterns, root_dir, config_file, debug_build, force_build, true, true
 	}
 
 	// default: -all
@@ -118,12 +138,19 @@ parse_cli_args :: proc(args: []string) -> (plan: SuitePlan, include_patterns: [d
 		plan.step_count = 3
 	}
 
-	root_dir, _ = filepath.abs(".")
 	if len(root_dir) == 0 {
-		root_dir = "."
+		root_dir, _ = filepath.abs(".")
+		if len(root_dir) == 0 {
+			root_dir = "."
+		}
+	} else {
+		resolved, abs_ok := filepath.abs(root_dir)
+		if abs_ok {
+			root_dir = resolved
+		}
 	}
 
-	return plan, include_patterns, exclude_patterns, root_dir, debug_build, force_build, false, true
+	return plan, include_patterns, exclude_patterns, root_dir, config_file, debug_build, force_build, false, true
 }
 
 // parse_package_filter parses the value of -packages=VALUE.

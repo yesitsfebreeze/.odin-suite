@@ -50,11 +50,11 @@ _is_safe_suite_path :: proc(s: string) -> bool {
 //   # comment or blank line
 //
 // Each entry runs check → test → build as controlled by CLI flags.
-load_suite_config :: proc(root_dir: string) -> (entries: [dynamic]SuiteEntry, collections: [dynamic]CollectionDecl, ok: bool) {
+load_suite_config :: proc(root_dir: string, config_file: string = "") -> (entries: [dynamic]SuiteEntry, collections: [dynamic]CollectionDecl, ok: bool) {
 	entries     = make([dynamic]SuiteEntry)
 	collections = make([dynamic]CollectionDecl)
 
-	config_path := filepath.join({root_dir, SUITE_CONFIG})
+	config_path := filepath.join({root_dir, config_file}) if len(config_file) > 0 else filepath.join({root_dir, SUITE_CONFIG})
 	defer delete(config_path)
 
 	data, read_ok := os.read_entire_file(config_path)
@@ -118,6 +118,42 @@ load_suite_config :: proc(root_dir: string) -> (entries: [dynamic]SuiteEntry, co
 			name := filepath.base(path)
 			append(&entries, SuiteEntry{
 				kind     = .Test,
+				path     = strings.clone(path),
+				name     = strings.clone(name),
+				nostrict = ns,
+			})
+			continue
+		}
+
+		// shared: path [nostrict]  (check + build as shared library)
+		if strings.has_prefix(t, "shared:") {
+			rest := strings.trim_space(t[len("shared:"):])
+			if len(rest) == 0 { continue }
+			ns := strings.has_suffix(rest, "nostrict")
+			path := strings.trim_space(rest[:len(rest) - len("nostrict")]) if ns else rest
+			if len(path) == 0 { continue }
+			if !_is_safe_suite_path(path) { continue }
+			name := filepath.base(path)
+			append(&entries, SuiteEntry{
+				kind     = .Shared,
+				path     = strings.clone(path),
+				name     = strings.clone(name),
+				nostrict = ns,
+			})
+			continue
+		}
+
+		// check: path [nostrict]  (check only, no test, no build)
+		if strings.has_prefix(t, "check:") {
+			rest := strings.trim_space(t[len("check:"):])
+			if len(rest) == 0 { continue }
+			ns := strings.has_suffix(rest, "nostrict")
+			path := strings.trim_space(rest[:len(rest) - len("nostrict")]) if ns else rest
+			if len(path) == 0 { continue }
+			if !_is_safe_suite_path(path) { continue }
+			name := filepath.base(path)
+			append(&entries, SuiteEntry{
+				kind     = .Check,
 				path     = strings.clone(path),
 				name     = strings.clone(name),
 				nostrict = ns,
