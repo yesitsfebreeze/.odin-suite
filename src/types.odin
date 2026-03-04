@@ -24,6 +24,7 @@ SuiteEntry :: struct {
 	name:     string,   // last path component, for display
 	nostrict: bool,     // skip -strict-style -vet when checking
 	is_main:  bool,     // true if this is the main entry (declared via main:)
+	is_sub:   bool,     // true if auto-discovered as sub-package test
 }
 
 CollectionDecl :: struct {
@@ -88,6 +89,8 @@ EntryResult :: struct {
 	update_stamp: bool,   // true if all steps passed, stamp should be saved
 	stamp_key:    string, // entry path
 	stamp_hash:   string, // hash of entry + collections
+	error_count:  int,    // for sub-log display: number of failed tests
+	total_tests:  int,    // for sub-log display: total tests run
 }
 
 EntryWorkerData :: struct {
@@ -102,4 +105,5 @@ EntryWorkerData :: struct {
 	table_rows:       ^[dynamic]TableRow, // global display rows; nil = display disabled
 	table_rows_start: int,                // index of this entry's first row
 	done_flag:        ^bool,              // set true when this entry finishes
+	sub_log_entry:    ^SubLogEntry,       // for sub-package log display; nil = not a sub
 }

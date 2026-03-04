@@ -193,7 +193,7 @@ load_suite_config :: proc(root_dir: string, config_file: string = "") -> (entrie
 		if e.kind != .Build { continue }
 
 		subdirs := make([dynamic]string)
-		_find_package_subdirs(root_dir, e.path, &subdirs)
+		_find_package_subdirs(root_dir, e.path, &subdirs, existing_paths)
 		for sub_path in subdirs {
 			if !(sub_path in existing_paths) {
 				path_clone := strings.clone(sub_path)
@@ -202,6 +202,7 @@ load_suite_config :: proc(root_dir: string, config_file: string = "") -> (entrie
 					path     = path_clone,
 					name     = strings.clone(sub_path),
 					nostrict = e.nostrict,
+					is_sub   = true,
 				})
 				existing_paths[path_clone] = true
 			}
@@ -298,9 +299,10 @@ _dir_has_tests_file :: proc(root_dir, rel_path: string) -> bool {
 
 // _find_package_subdirs walks the tree rooted at root_dir/parent_path and
 // appends (heap-allocated) relative paths for every sub-directory that
-// contains an `@tests.odin` file.  Caller must delete each string.
+// contains an `@tests.odin` file.  Skips directories that are already
+// declared as entries (sub-entries).  Caller must delete each string.
 @(private)
-_find_package_subdirs :: proc(root_dir, parent_path: string, out: ^[dynamic]string) {
+_find_package_subdirs :: proc(root_dir, parent_path: string, out: ^[dynamic]string, entry_paths: map[string]bool) {
 	abs := filepath.join({root_dir, parent_path})
 	defer delete(abs)
 	fh, err := os.open(abs)
@@ -316,10 +318,16 @@ _find_package_subdirs :: proc(root_dir, parent_path: string, out: ^[dynamic]stri
 			delete(sub_path)
 			continue
 		}
+		// Skip sub-entries: directories that are already declared as entries
+		// (they need to be compiled separately and have their own entry point).
+		if sub_path in entry_paths {
+			delete(sub_path)
+			continue
+		}
 		if _dir_has_tests_file(root_dir, sub_path) {
 			append(out, strings.clone(sub_path))
 		}
-		_find_package_subdirs(root_dir, sub_path, out)
+		_find_package_subdirs(root_dir, sub_path, out, entry_paths)
 		delete(sub_path)
 	}
 }

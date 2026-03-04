@@ -85,6 +85,30 @@ tr_done :: #force_inline proc(data: ^EntryWorkerData) {
 	if data.done_flag != nil { data.done_flag^ = true }
 }
 
+// ── sub-log helpers (for sub-package tests with is_sub=true) ─────────────────
+
+@(private="file")
+sl_running :: #force_inline proc(data: ^EntryWorkerData) {
+	if data.sub_log_entry == nil { return }
+	data.sub_log_entry.state = .Running
+}
+
+@(private="file")
+sl_pass :: #force_inline proc(data: ^EntryWorkerData, total_tests: int) {
+	if data.sub_log_entry == nil { return }
+	data.sub_log_entry.state       = .Passed
+	data.sub_log_entry.total_tests = total_tests
+	data.sub_log_entry.error_count = 0
+}
+
+@(private="file")
+sl_fail :: #force_inline proc(data: ^EntryWorkerData, error_count: int, total_tests: int) {
+	if data.sub_log_entry == nil { return }
+	data.sub_log_entry.state       = .Failed
+	data.sub_log_entry.error_count = error_count
+	data.sub_log_entry.total_tests = total_tests
+}
+
 // run_entry_worker processes one SuiteEntry running plan.steps in declared order.
 // Results are written to data.results^[data.idx]; no shared mutex needed.
 run_entry_worker :: proc(t: ^thread.Thread) {
@@ -102,6 +126,8 @@ run_entry_worker :: proc(t: ^thread.Thread) {
 		stamp_hash   = strings.clone(data.current_hash),
 	}
 
+	sl_running(data)
+
 	for i in 0..<plan.step_count {
 		step      := plan.steps[i]
 		remaining := plan.step_count - i - 1
@@ -118,12 +144,15 @@ run_entry_worker :: proc(t: ^thread.Thread) {
 				err_info := fmt.aprintf("%d error%s", n_err, "s" if n_err != 1 else "") if n_err > 0 else "failed"
 				suffix   := "; remaining steps skipped" if remaining > 0 else ""
 				fmt.sbprintf(&log, "fail %s: check failed%s\n%s\n", entry.name, suffix, cr.output)
-				result.status     = .Failed
-				result.detail     = "check failed"
-				result.log_output = strings.clone(strings.to_string(log))
+				result.status      = .Failed
+				result.detail      = "check failed"
+				result.log_output  = strings.clone(strings.to_string(log))
+				result.error_count = n_err
+				result.total_tests = 0
 				strings.builder_destroy(&log)
 				data.results^[data.idx] = result
 				tr_fail(data, .Check, err_info, strings.clone(cr.output))
+				sl_fail(data, n_err, 0)
 				delete(cr.output)
 				return
 			}
@@ -139,16 +168,20 @@ run_entry_worker :: proc(t: ^thread.Thread) {
 				test_info    := fmt.aprintf("[%d/%d]", passed_count, tr.total_tests) if tr.total_tests > 0 else "failed"
 				suffix       := "; remaining steps skipped" if remaining > 0 else ""
 				fmt.sbprintf(&log, "fail %s: tests failed%s\n%s\n", entry.name, suffix, tr.output)
-				result.status     = .Failed
-				result.detail     = "tests failed"
-				result.log_output = strings.clone(strings.to_string(log))
+				result.status      = .Failed
+				result.detail      = "tests failed"
+				result.log_output  = strings.clone(strings.to_string(log))
+				result.error_count = tr.failed_tests
+				result.total_tests = tr.total_tests
 				strings.builder_destroy(&log)
 				data.results^[data.idx] = result
 				tr_fail(data, .Test, test_info, strings.clone(tr.output))
+				sl_fail(data, tr.failed_tests, tr.total_tests)
 				delete(tr.output)
 				return
 			}
 			tr_pass(data, .Test, fmt.aprintf("[%d/%d]", tr.total_tests, tr.total_tests))
+			sl_pass(data, tr.total_tests)
 			fmt.sbprintf(&log, "ok %s: test\n", entry.name)
 			delete(tr.output)
 

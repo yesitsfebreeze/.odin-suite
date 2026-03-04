@@ -8,6 +8,80 @@ suite_exit :: proc(code: int) {
 	os.exit(code)
 }
 
+// ─── Sub-package log display ──────────────────────────────────────────────────
+//
+// Simple log-style output for auto-discovered sub-package tests:
+//   ● path/to/sub: OK
+//   ○ path/to/sub: Error [1/8]
+//
+// Cycling dots (`○` / `●`) indicate work in progress.
+
+SubLogEntry :: struct {
+	path:        string,
+	state:       TaskState,
+	error_count: int,
+	total_tests: int,
+}
+
+// print_sub_log_live redraws the sub-package log lines in place.
+// tick is used to cycle between ○ and ● for running entries.
+// Returns the number of lines printed.
+print_sub_log_live :: proc(entries: []SubLogEntry, tick: int) -> int {
+	if len(entries) == 0 { return 0 }
+
+	b := strings.builder_make()
+	defer strings.builder_destroy(&b)
+
+	// Move cursor up to overwrite previous output.
+	fmt.sbprintf(&b, "\x1b[%dA\r", len(entries))
+
+	dot_filled := (tick % 2) == 0
+	for entry in entries {
+		dot: string
+		switch entry.state {
+		case .Running:
+			dot = "●" if dot_filled else "○"
+			fmt.sbprintf(&b, "%s%s%s %s%s\x1b[K\n", YELLOW, dot, RESET, entry.path, RESET)
+		case .Passed:
+			fmt.sbprintf(&b, "%s●%s %s: %sOK%s\x1b[K\n", GREEN, RESET, entry.path, GREEN, RESET)
+		case .Failed:
+			fmt.sbprintf(&b, "%s●%s %s: %sError [%d/%d]%s\x1b[K\n",
+				RED, RESET, entry.path, RED, entry.error_count, entry.total_tests, RESET)
+		case .Pending:
+			fmt.sbprintf(&b, "%s○%s %s%s\x1b[K\n", DIM, RESET, DIM, entry.path)
+		case .Skipped:
+			fmt.sbprintf(&b, "%s○%s %s: %sskipped%s\x1b[K\n", DIM, RESET, entry.path, DIM, RESET)
+		}
+	}
+
+	os.write(os.stdout, transmute([]u8)strings.to_string(b))
+	return len(entries)
+}
+
+// print_sub_log_init prints initial placeholder lines for sub entries.
+print_sub_log_init :: proc(entries: []SubLogEntry) {
+	for entry in entries {
+		fmt.printf("%s○%s %s%s%s\n", DIM, RESET, DIM, entry.path, RESET)
+	}
+}
+
+// print_sub_log_final prints the final state of sub-package tests.
+print_sub_log_final :: proc(entries: []SubLogEntry) {
+	for entry in entries {
+		switch entry.state {
+		case .Passed:
+			fmt.printf("%s●%s %s: %sOK%s\n", GREEN, RESET, entry.path, GREEN, RESET)
+		case .Failed:
+			fmt.printf("%s●%s %s: %sError [%d/%d]%s\n",
+				RED, RESET, entry.path, RED, entry.error_count, entry.total_tests, RESET)
+		case .Skipped:
+			fmt.printf("%s○%s %s: %sskipped%s\n", DIM, RESET, entry.path, DIM, RESET)
+		case .Pending, .Running:
+			fmt.printf("%s○%s %s\n", DIM, RESET, entry.path)
+		}
+	}
+}
+
 // ─── Unified table ────────────────────────────────────────────────────────────
 //
 // One row per entry:   SUITE | CHECK | TEST      | BUILD
